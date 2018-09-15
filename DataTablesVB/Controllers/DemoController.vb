@@ -1,11 +1,10 @@
-﻿Imports DemoDatatables.Models
-Imports System
-Imports System.Linq
-Imports System.Web.Mvc
+﻿
 Imports System.Linq.Dynamic
 Imports System.Data.Entity
 Imports System.Runtime.CompilerServices
 Imports System.Linq.Expressions
+Imports System.Data.SqlClient
+Imports DataTablesVB.DemoDatatables
 
 Namespace Controllers
     Public Class DemoController
@@ -20,7 +19,7 @@ Namespace Controllers
         Public Function LoadData() As ActionResult
             Try
 
-                Using _context As DatabaseContext = New DatabaseContext()
+                Using con As SqlConnection = New SqlConnection(ConfigurationManager.ConnectionStrings("DBConnection").ToString())
                     Dim draw = Request.Form.GetValues("draw").FirstOrDefault()
                     Dim start = Request.Form.GetValues("start").FirstOrDefault()
                     Dim length = Request.Form.GetValues("length").FirstOrDefault()
@@ -30,8 +29,23 @@ Namespace Controllers
                     Dim pageSize As Integer = If(length IsNot Nothing, Convert.ToInt32(length), 0)
                     Dim skip As Integer = If(start IsNot Nothing, Convert.ToInt32(start), 0)
                     Dim recordsTotal As Integer = 0
-                    Dim customerData = (From tempcustomer In _context.Customers Select tempcustomer)
+                    Dim dtCustomers As DataTable = New DataTable()
+                    con.Open()
 
+                    Using cmd As SqlCommand = New SqlCommand()
+                        cmd.Connection = con
+                        cmd.CommandType = System.Data.CommandType.StoredProcedure
+                        cmd.CommandText = "uspGetCustomers"
+
+                        Using adapter As SqlDataAdapter = New SqlDataAdapter(cmd)
+                            adapter.Fill(dtCustomers)
+                        End Using
+                    End Using
+
+                    Dim lstcustomerData As List(Of Customers) = Utils.DataTableHelper.DataTableToList(Of Customers)(dtCustomers)
+                    Dim customerData = lstcustomerData.AsQueryable()
+
+                    'Below portion can be removed after moving as paramter to stored procedure
                     If Not (String.IsNullOrEmpty(sortColumn) AndAlso String.IsNullOrEmpty(sortColumnDir)) Then
                         customerData = customerData.OrderBy(sortColumn & " " + sortColumnDir)
                     End If
